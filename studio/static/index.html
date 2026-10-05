@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="tr" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>⚡ Antigravity Local Studio</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#ecfeff',
+              400: '#22d3ee',
+              500: '#06b6d4',
+              600: '#0891b2',
+            },
+            surface: {
+              base: '#090d16',
+              card: '#0f172a',
+              hover: '#1e293b',
+              border: '#1e293b',
+            }
+          },
+          fontFamily: {
+            mono: ['JetBrains Mono', 'Fira Code', 'Menlo', 'Consolas', 'monospace']
+          }
+        }
+      }
+    }
+  </script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <style>
+    /* Custom scrollbars */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #090d16; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334155; }
+    .editor-line-numbers { user-select: none; }
+    .diff-add { background-color: rgba(34, 197, 94, 0.15); color: #4ade80; }
+    .diff-del { background-color: rgba(239, 68, 68, 0.15); color: #f87171; }
+    .diff-hunk { background-color: rgba(56, 189, 248, 0.1); color: #38bdf8; }
+    @keyframes pulse-slow { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .animate-pulse-slow { animation: pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+  </style>
+</head>
+<body class="bg-surface-base text-slate-200 h-screen w-screen flex flex-col overflow-hidden font-sans select-none">
+
+  <!-- TOP HEADER -->
+  <header class="h-12 border-b border-surface-border bg-surface-card/80 backdrop-blur flex items-center justify-between px-4 z-20">
+    <div class="flex items-center space-x-3">
+      <div class="flex items-center space-x-2 font-bold tracking-tight text-white text-sm">
+        <span class="w-6 h-6 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center border border-cyan-500/30">⚡</span>
+        <span class="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">Antigravity</span>
+        <span class="text-xs px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-400 border border-cyan-800 font-mono">STUDIO</span>
+      </div>
+
+      <div class="h-4 w-px bg-slate-800"></div>
+
+      <!-- Repo & Git Info -->
+      <div class="flex items-center space-x-2 text-xs">
+        <span id="repoName" class="text-slate-300 font-medium">deneme 222</span>
+        <span class="flex items-center space-x-1 px-2 py-0.5 rounded bg-slate-800/80 border border-slate-700 text-slate-300 font-mono">
+          <i data-lucide="git-branch" class="w-3 h-3 text-cyan-400"></i>
+          <span id="gitBranch">main</span>
+        </span>
+        <span id="dirtyBadge" class="hidden text-amber-400 bg-amber-950/60 border border-amber-800 px-1.5 py-0.5 rounded text-[11px] font-mono">
+          Değişiklikler Var
+        </span>
+      </div>
+    </div>
+
+    <!-- Center Mode Switcher -->
+    <div class="flex items-center bg-slate-900 border border-slate-800 rounded-lg p-0.5 text-xs">
+      <button id="modeAgent" onclick="setMode('agent')" class="px-2.5 py-1 rounded-md transition font-medium flex items-center space-x-1 bg-cyan-500 text-black">
+        <i data-lucide="sparkles" class="w-3 h-3"></i>
+        <span>Kod Ajanı</span>
+      </button>
+      <button id="modeArchitect" onclick="setMode('architect')" class="px-2.5 py-1 rounded-md transition text-slate-400 hover:text-white flex items-center space-x-1">
+        <i data-lucide="compass" class="w-3 h-3"></i>
+        <span>Mimar (Architect)</span>
+      </button>
+      <button id="modeChat" onclick="setMode('chat')" class="px-2.5 py-1 rounded-md transition text-slate-400 hover:text-white flex items-center space-x-1">
+        <i data-lucide="message-square" class="w-3 h-3"></i>
+        <span>Sohbet</span>
+      </button>
+    </div>
+
+    <!-- Right Controls -->
+    <div class="flex items-center space-x-3 text-xs">
+      <!-- Ollama Status & Model -->
+      <div class="flex items-center space-x-2 bg-slate-900 border border-slate-800 px-2 py-1 rounded-lg">
+        <span id="ollamaBeacon" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <select id="modelSelect" class="bg-transparent text-slate-200 outline-none cursor-pointer pr-1">
+          <option value="qwen2.5-coder:7b">qwen2.5-coder:7b</option>
+          <option value="qwen2.5-coder:3b">qwen2.5-coder:3b</option>
+          <option value="mistral:latest">mistral:latest</option>
+        </select>
+      </div>
+
+      <button onclick="commitWorkspace()" class="flex items-center space-x-1.5 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition">
+        <i data-lucide="git-commit" class="w-3.5 h-3.5 text-emerald-400"></i>
+        <span>Commit Et</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN 3-COLUMN WORKSPACE -->
+  <main class="flex-1 flex overflow-hidden">
+
+    <!-- LEFT PANEL: FILE EXPLORER & GIT -->
+    <aside class="w-64 border-r border-surface-border bg-surface-card flex flex-col shrink-0">
+      <div class="p-3 border-b border-surface-border flex items-center justify-between">
+        <div class="flex items-center space-x-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+          <i data-lucide="folder-tree" class="w-3.5 h-3.5 text-cyan-400"></i>
+          <span>Dosyalar</span>
+        </div>
+        <div class="flex items-center space-x-1">
+          <button onclick="refreshFiles()" title="Yenile" class="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+          </button>
+          <button onclick="createNewFilePrompt()" title="Yeni Dosya" class="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white">
+            <i data-lucide="file-plus" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- File filter -->
+      <div class="px-3 py-2 border-b border-surface-border">
+        <div class="relative">
+          <i data-lucide="search" class="w-3.5 h-3.5 absolute left-2.5 top-2 text-slate-500"></i>
+          <input type="text" id="fileSearch" placeholder="Dosya ara..." oninput="filterFiles()" class="w-full bg-slate-900 border border-slate-800 rounded pl-7 pr-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 placeholder-slate-600">
+        </div>
+      </div>
+
+      <!-- File list -->
+      <div id="fileTree" class="flex-1 overflow-y-auto p-2 space-y-0.5 text-xs font-mono">
+        <!-- Injected via JS -->
+      </div>
+
+      <!-- Left Bottom Git Summary -->
+      <div class="p-2.5 border-t border-surface-border bg-slate-900/60 text-[11px] text-slate-400 flex items-center justify-between">
+        <span id="fileCountText">0 dosya</span>
+        <button onclick="toggleDiffView()" class="text-cyan-400 hover:underline flex items-center space-x-1">
+          <i data-lucide="git-compare" class="w-3 h-3"></i>
+          <span>Diff İncele</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- CENTER PANEL: EDITOR, DIFF VIEWER & TERMINAL -->
+    <section class="flex-1 flex flex-col border-r border-surface-border bg-surface-base overflow-hidden">
+      
+      <!-- Tab & View Bar -->
+      <div class="h-9 border-b border-surface-border bg-surface-card flex items-center justify-between px-2 shrink-0">
+        <div id="tabBar" class="flex items-center space-x-1 overflow-x-auto text-xs">
+          <!-- Injected active tab -->
+        </div>
+
+        <div class="flex items-center space-x-1 text-xs">
+          <button id="viewCodeBtn" onclick="showEditorView()" class="px-2 py-1 rounded bg-slate-800 text-cyan-400 font-medium flex items-center space-x-1">
+            <i data-lucide="code" class="w-3.5 h-3.5"></i>
+            <span>Kod</span>
+          </button>
+          <button id="viewDiffBtn" onclick="showDiffView()" class="px-2 py-1 rounded hover:bg-slate-800 text-slate-400 font-medium flex items-center space-x-1">
+            <i data-lucide="git-pull-request" class="w-3.5 h-3.5"></i>
+            <span>Git Diff</span>
+          </button>
+          <button onclick="saveCurrentFile()" title="Kaydet (Cmd/Ctrl+S)" class="px-2 py-1 rounded bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 border border-emerald-500/30 font-medium flex items-center space-x-1">
+            <i data-lucide="save" class="w-3.5 h-3.5"></i>
+            <span>Kaydet</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Editor Body -->
+      <div class="flex-1 flex overflow-hidden relative">
+        <!-- CODE VIEW -->
+        <div id="editorContainer" class="flex-1 flex flex-col overflow-hidden">
+          <textarea id="codeEditor" spellcheck="false" class="w-full h-full p-4 font-mono text-xs bg-surface-base text-slate-200 outline-none resize-none leading-relaxed border-none focus:ring-0"></textarea>
+        </div>
+
+        <!-- DIFF VIEW -->
+        <div id="diffContainer" class="hidden flex-1 overflow-y-auto p-4 font-mono text-xs bg-[#070b12] text-slate-300">
+          <div id="diffOutput" class="space-y-1">Henüz bir diff yok.</div>
+        </div>
+      </div>
+
+      <!-- BOTTOM TERMINAL DRAWER -->
+      <div id="terminalDrawer" class="h-44 border-t border-surface-border bg-slate-950 flex flex-col shrink-0">
+        <div class="h-7 bg-slate-900 border-b border-surface-border flex items-center justify-between px-3 text-[11px] text-slate-400">
+          <div class="flex items-center space-x-2">
+            <i data-lucide="terminal" class="w-3.5 h-3.5 text-cyan-400"></i>
+            <span class="font-semibold text-slate-300 uppercase tracking-wider">Terminal Çıktısı</span>
+          </div>
+          <div class="flex items-center space-x-2">
+            <button onclick="runQuickCommand('python demo.py')" class="hover:text-cyan-400">demo.py çalıştır</button>
+            <span>•</span>
+            <button onclick="runQuickCommand('git status')" class="hover:text-cyan-400">git status</button>
+            <span>•</span>
+            <button onclick="clearTerminal()" class="hover:text-red-400">Temizle</button>
+          </div>
+        </div>
+
+        <div id="terminalOutput" class="flex-1 overflow-y-auto p-2 font-mono text-xs text-slate-300 whitespace-pre-wrap select-text leading-relaxed">
+[Antigravity Local Studio hazır. Komut çalıştırmak için aşağıya yazın.]
+        </div>
+
+        <form onsubmit="handleTerminalSubmit(event)" class="h-8 border-t border-surface-border bg-slate-900/80 flex items-center px-2">
+          <span class="text-cyan-400 font-mono text-xs pr-2">$</span>
+          <input type="text" id="terminalInput" placeholder="bash komutu çalıştır (örn: ls -la, git diff, python test.py)..." class="flex-1 bg-transparent text-xs text-slate-200 font-mono outline-none">
+          <button type="submit" class="px-2 py-0.5 rounded bg-slate-800 text-cyan-400 hover:bg-slate-700 text-xs">Çalıştır</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- RIGHT PANEL: ANTIGRAVITY COPILOT (CLAUDE CODE STYLE AGENT) -->
+    <aside class="w-96 flex flex-col bg-surface-card shrink-0 overflow-hidden">
+      <!-- Copilot Header -->
+      <div class="p-3 border-b border-surface-border flex items-center justify-between">
+        <div class="flex items-center space-x-2">
+          <div class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></div>
+          <span class="text-xs font-bold text-white uppercase tracking-wider">Ajan Asistanı</span>
+        </div>
+        <div class="flex items-center space-x-1">
+          <span id="activeContextPill" class="text-[10px] bg-slate-800 text-cyan-300 px-2 py-0.5 rounded border border-slate-700 truncate max-w-[130px]">
+            Bağlam Yok
+          </span>
+          <button onclick="clearChat()" title="Sohbeti Temizle" class="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick Action Chips -->
+      <div class="p-2 border-b border-surface-border flex items-center space-x-1.5 overflow-x-auto text-[11px] bg-slate-900/40">
+        <button onclick="sendPromptPreset('Bu açık dosyayı incele, olası hataları ve optimizasyonları belirt.')" class="shrink-0 px-2 py-0.5 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">🔍 İncele</button>
+        <button onclick="sendPromptPreset('Bu kod için pytest testleri yaz ve demo.py içine entegre et.')" class="shrink-0 px-2 py-0.5 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">🧪 Test Yaz</button>
+        <button onclick="sendPromptPreset('Bu kodu temizle, tip ipuçları (type hints) ve docstring ekle.')" class="shrink-0 px-2 py-0.5 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">✨ Refactor</button>
+      </div>
+
+      <!-- Chat Stream Area -->
+      <div id="chatHistory" class="flex-1 overflow-y-auto p-3 space-y-4 text-xs select-text">
+        <!-- Welcome Message -->
+        <div class="p-3 rounded-lg bg-slate-900/90 border border-slate-800 text-slate-300 space-y-2">
+          <div class="flex items-center space-x-2 text-cyan-400 font-semibold text-xs">
+            <i data-lucide="bot" class="w-4 h-4"></i>
+            <span>Antigravity Ajanı Hazır</span>
+          </div>
+          <p class="text-slate-400 leading-relaxed text-[11px]">
+            Claude Code ve Antigravity mimarisinde çalışan yerel ajan stüdyonuz devrede. Dosyalarınızı inceleyebilir, mimari tasarlayabilir ve doğrudan kod üretebilirim.
+          </p>
+          <div class="text-[10px] text-slate-500 border-t border-slate-800/80 pt-1.5">
+            İpucu: Sol taraftan bir dosyaya tıkladığınızda ajan o dosyayı doğrudan bağlamına alır.
+          </div>
+        </div>
+      </div>
+
+      <!-- Chat Input Area -->
+      <div class="p-3 border-t border-surface-border bg-slate-900/90">
+        <div class="relative rounded-lg border border-slate-700 bg-surface-base focus-within:border-cyan-500 transition">
+          <textarea id="chatInput" rows="3" placeholder="Ajan'a bir görev ver (Örn: show_greeting.py içine renkli karşılama fonksiyonu ekle)..." class="w-full bg-transparent p-2.5 text-xs text-slate-200 outline-none resize-none leading-relaxed placeholder-slate-500"></textarea>
+
+          <div class="flex items-center justify-between p-2 pt-0 text-[11px] text-slate-500 border-t border-slate-800/50 mt-1">
+            <span class="text-[10px]">Cmd/Ctrl + Enter gönderir</span>
+            <button id="sendBtn" onclick="handleSendChat()" class="px-3 py-1 rounded bg-cyan-500 hover:bg-cyan-400 text-black font-semibold flex items-center space-x-1 transition disabled:opacity-50">
+              <span id="sendBtnText">Gönder</span>
+              <i data-lucide="send" class="w-3 h-3"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+  </main>
+
+  <script>
+    // Application State
+    let currentMode = 'agent';
+    let activeFilePath = null;
+    let fileContentsCache = {};
+    let isGenerating = false;
+    let messagesHistory = [];
+
+    // Initialize
+    document.addEventListener("DOMContentLoaded", async () => {
+      lucide.createIcons();
+      await loadWorkspace();
+      await loadModels();
+
+      // Keyboard shortcuts
+      document.addEventListener("keydown", (e) => {
+        if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+          e.preventDefault();
+          saveCurrentFile();
+        }
+        if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && document.activeElement === document.getElementById("chatInput")) {
+          e.preventDefault();
+          handleSendChat();
+        }
+      });
+    });
+
+    function setMode(mode) {
+      currentMode = mode;
+      const modes = ['agent', 'architect', 'chat'];
+      modes.forEach(m => {
+        const btn = document.getElementById('mode' + m.charAt(0).toUpperCase() + m.slice(1));
+        if (m === mode) {
+          btn.className = "px-2.5 py-1 rounded-md transition font-medium flex items-center space-x-1 bg-cyan-500 text-black";
+        } else {
+          btn.className = "px-2.5 py-1 rounded-md transition text-slate-400 hover:text-white flex items-center space-x-1";
+        }
+      });
+    }
+
+    async function loadWorkspace() {
+      try {
+        const res = await fetch("/api/workspace");
+        const data = await res.json();
+        document.getElementById("repoName").innerText = data.name;
+        document.getElementById("gitBranch").innerText = data.branch;
+        document.getElementById("fileCountText").innerText = `${data.files.length} dosya`;
+
+        const dirtyBadge = document.getElementById("dirtyBadge");
+        if (data.dirty) {
+          dirtyBadge.classList.remove("hidden");
+          dirtyBadge.innerText = `${data.uncommitted_count} Değişiklik`;
+        } else {
+          dirtyBadge.classList.add("hidden");
+        }
+
+        renderFileTree(data.files);
+        if (!activeFilePath && data.files.length > 0) {
+          // Open first interesting file
+          const firstPy = data.files.find(f => f.ext === 'py') || data.files[0];
+          openFile(firstPy.path);
+        }
+      } catch (err) {
+        console.error("Workspace yüklenemedi:", err);
+      }
+    }
+
+    function renderFileTree(files) {
+      const tree = document.getElementById("fileTree");
+      tree.innerHTML = "";
+
+      files.forEach(f => {
+        const item = document.createElement("div");
+        const isActive = f.path === activeFilePath;
+        item.className = `flex items-center justify-between px-2 py-1.5 rounded cursor-pointer transition ${isActive ? 'bg-cyan-950 text-cyan-300 border border-cyan-800' : 'hover:bg-slate-800/80 text-slate-300'}`;
+        item.onclick = () => openFile(f.path);
+
+        const icon = getFileIcon(f.ext);
+        let gitBadge = "";
+        if (f.git_status === "M") {
+          gitBadge = `<span class="text-[10px] text-amber-400 bg-amber-950/60 px-1 rounded font-bold">M</span>`;
+        } else if (f.git_status === "??") {
+          gitBadge = `<span class="text-[10px] text-emerald-400 bg-emerald-950/60 px-1 rounded font-bold">U</span>`;
+        }
+
+        item.innerHTML = `
+          <div class="flex items-center space-x-2 truncate">
+            <span class="text-xs">${icon}</span>
+            <span class="truncate">${f.path}</span>
+          </div>
+          <div>${gitBadge}</div>
+        `;
+        tree.appendChild(item);
+      });
+    }
+
+    function getFileIcon(ext) {
+      switch (ext) {
+        case 'py': return '🐍';
+        case 'sh': return '🐚';
+        case 'md': return '📝';
+        case 'json': return '📦';
+        case 'yml':
+        case 'yaml': return '⚙️';
+        case 'html': return '🌐';
+        default: return '📄';
+      }
+    }
+
+    async function openFile(relPath) {
+      activeFilePath = relPath;
+      document.getElementById("activeContextPill").innerText = `@${relPath}`;
+      document.getElementById("activeContextPill").title = `Aktif Dosya: ${relPath}`;
+
+      // Update tabs
+      const tabBar = document.getElementById("tabBar");
+      tabBar.innerHTML = `
+        <div class="px-2.5 py-1 rounded bg-slate-900 border border-slate-700 text-cyan-300 font-mono font-medium flex items-center space-x-1.5">
+          <span>${getFileIcon(relPath.split('.').pop())}</span>
+          <span>${relPath}</span>
+        </div>
+      `;
+
+      try {
+        const res = await fetch(`/api/file?path=${encodeURIComponent(relPath)}`);
+        const data = await res.json();
+        const editor = document.getElementById("codeEditor");
+        editor.value = data.content;
+        fileContentsCache[relPath] = data.content;
+        showEditorView();
+        await loadWorkspace(); // refresh status highlights
+      } catch (err) {
+        alert("Dosya okunamadı: " + err.message);
+      }
+    }
+
+    async function saveCurrentFile() {
+      if (!activeFilePath) return;
+      const editor = document.getElementById("codeEditor");
+      const content = editor.value;
+
+      try {
+        const res = await fetch("/api/file", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: activeFilePath, content: content }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          appendTerminalOutput(`✓ [Kaydedildi] ${activeFilePath} (${data.size} bytes)`);
+          await loadWorkspace();
+        } else {
+          alert("Kaydetme hatası: " + data.error);
+        }
+      } catch (err) {
+        alert("Kaydetme hatası: " + err.message);
+      }
+    }
+
+    function showEditorView() {
+      document.getElementById("editorContainer").classList.remove("hidden");
+      document.getElementById("diffContainer").classList.add("hidden");
+      document.getElementById("viewCodeBtn").className = "px-2 py-1 rounded bg-slate-800 text-cyan-400 font-medium flex items-center space-x-1";
+      document.getElementById("viewDiffBtn").className = "px-2 py-1 rounded hover:bg-slate-800 text-slate-400 font-medium flex items-center space-x-1";
+    }
+
+    async function showDiffView() {
+      document.getElementById("editorContainer").classList.add("hidden");
+      document.getElementById("diffContainer").classList.remove("hidden");
+      document.getElementById("viewCodeBtn").className = "px-2 py-1 rounded hover:bg-slate-800 text-slate-400 font-medium flex items-center space-x-1";
+      document.getElementById("viewDiffBtn").className = "px-2 py-1 rounded bg-slate-800 text-cyan-400 font-medium flex items-center space-x-1";
+
+      const diffOutput = document.getElementById("diffOutput");
+      diffOutput.innerHTML = "Diff yükleniyor...";
+
+      try {
+        const res = await fetch(`/api/git/diff?path=${activeFilePath ? encodeURIComponent(activeFilePath) : ''}`);
+        const data = await res.json();
+        if (!data.diff || data.diff.trim() === "") {
+          diffOutput.innerHTML = `<div class="text-slate-500 p-4">Hiçbir değişiklik yok (Working tree clean).</div>`;
+          return;
+        }
+
+        const lines = data.diff.split("\n");
+        let html = "";
+        lines.forEach(line => {
+          if (line.startsWith("+") && !line.startsWith("+++")) {
+            html += `<div class="diff-add px-2 py-0.5">${escapeHtml(line)}</div>`;
+          } else if (line.startsWith("-") && !line.startsWith("---")) {
+            html += `<div class="diff-del px-2 py-0.5">${escapeHtml(line)}</div>`;
+          } else if (line.startsWith("@@")) {
+            html += `<div class="diff-hunk px-2 py-0.5">${escapeHtml(line)}</div>`;
+          } else {
+            html += `<div class="px-2 py-0.5 text-slate-400">${escapeHtml(line)}</div>`;
+          }
+        });
+        diffOutput.innerHTML = html;
+      } catch (err) {
+        diffOutput.innerHTML = `<div class="text-red-400">Diff alınamadı: ${err.message}</div>`;
+      }
+    }
+
+    function toggleDiffView() {
+      const isDiffHidden = document.getElementById("diffContainer").classList.contains("hidden");
+      if (isDiffHidden) showDiffView();
+      else showEditorView();
+    }
+
+    async function loadModels() {
+      try {
+        const res = await fetch("/api/models");
+        const data = await res.json();
+        const sel = document.getElementById("modelSelect");
+        sel.innerHTML = "";
+        data.models.forEach(m => {
+          const opt = document.createElement("option");
+          opt.value = m;
+          opt.innerText = m;
+          sel.appendChild(opt);
+        });
+        const beacon = document.getElementById("ollamaBeacon");
+        if (data.connected) {
+          beacon.className = "w-2 h-2 rounded-full bg-emerald-400 animate-pulse";
+        } else {
+          beacon.className = "w-2 h-2 rounded-full bg-amber-400";
+        }
+      } catch (err) {
+        console.error("Model yükleme hatası:", err);
+      }
+    }
+
+    async function commitWorkspace() {
+      const msg = prompt("Commit mesajı girin:", "feat: update from Antigravity Studio");
+      if (!msg) return;
+
+      try {
+        const res = await fetch("/api/git/commit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: msg })
+        });
+        const data = await res.json();
+        if (data.success) {
+          appendTerminalOutput(`✓ [Git Commit Başarılı]\n${data.output}`);
+          await loadWorkspace();
+        } else {
+          alert("Commit başarısız: " + data.error);
+        }
+      } catch (err) {
+        alert("Commit hatası: " + err.message);
+      }
+    }
+
+    // TERMINAL
+    function appendTerminalOutput(text) {
+      const term = document.getElementById("terminalOutput");
+      term.innerText += "\n" + text;
+      term.scrollTop = term.scrollHeight;
+    }
+
+    function clearTerminal() {
+      document.getElementById("terminalOutput").innerText = "";
+    }
+
+    async function handleTerminalSubmit(e) {
+      e.preventDefault();
+      const input = document.getElementById("terminalInput");
+      const cmd = input.value.trim();
+      if (!cmd) return;
+      input.value = "";
+      await runQuickCommand(cmd);
+    }
+
+    async function runQuickCommand(cmd) {
+      appendTerminalOutput(`$ ${cmd}`);
+      try {
+        const res = await fetch("/api/terminal", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ command: cmd })
+        });
+        const data = await res.json();
+        if (data.stdout) appendTerminalOutput(data.stdout);
+        if (data.stderr) appendTerminalOutput("HATA:\n" + data.stderr);
+        appendTerminalOutput(`[Exited with code ${data.exit_code}]`);
+      } catch (err) {
+        appendTerminalOutput("Terminal hatası: " + err.message);
+      }
+    }
+
+    // CHAT & AGENT PIPELINE
+    function sendPromptPreset(txt) {
+      document.getElementById("chatInput").value = txt;
+      handleSendChat();
+    }
+
+    function clearChat() {
+      messagesHistory = [];
+      document.getElementById("chatHistory").innerHTML = `
+        <div class="p-3 rounded-lg bg-slate-900/90 border border-slate-800 text-slate-300">
+          Sohbet temizlendi.
+        </div>
+      `;
+    }
+
+    async function handleSendChat() {
+      if (isGenerating) return;
+      const input = document.getElementById("chatInput");
+      const userText = input.value.trim();
+      if (!userText) return;
+
+      input.value = "";
+      isGenerating = true;
+      document.getElementById("sendBtnText").innerText = "Düşünüyor...";
+
+      // Append user bubble
+      appendUserMessage(userText);
+      messagesHistory.push({ role: "user", content: userText });
+
+      // Create assistant container
+      const assistantContainer = createAssistantBubble();
+      const historyEl = document.getElementById("chatHistory");
+      historyEl.appendChild(assistantContainer);
+      historyEl.scrollTop = historyEl.scrollHeight;
+
+      let thoughtBuffer = "";
+      let contentBuffer = "";
+      const model = document.getElementById("modelSelect").value;
+      const editor = document.getElementById("codeEditor");
+
+      try {
+        const response = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: model,
+            messages: messagesHistory,
+            active_file: activeFilePath,
+            active_content: editor.value,
+            mode: currentMode,
+          })
+        });
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const parts = buffer.split("\n\n");
+          buffer = parts.pop();
+
+          for (const part of parts) {
+            const lines = part.split("\n");
+            let event = "message";
+            let dataStr = "";
+            for (const l of lines) {
+              if (l.startsWith("event: ")) event = l.substring(7);
+              if (l.startsWith("data: ")) dataStr = l.substring(6);
+            }
+
+            if (!dataStr) continue;
+            try {
+              const payload = JSON.parse(dataStr);
+              if (event === "thought") {
+                thoughtBuffer += payload.text;
+                updateThoughtAccordion(assistantContainer, thoughtBuffer);
+              } else if (event === "content") {
+                contentBuffer += payload.text;
+                updateContentMarkdown(assistantContainer, contentBuffer);
+              } else if (event === "error") {
+                contentBuffer += `\n\n> ❌ **Hata:** ${payload.message}`;
+                updateContentMarkdown(assistantContainer, contentBuffer);
+              }
+            } catch (err) {
+              console.error("SSE parse error", err);
+            }
+            historyEl.scrollTop = historyEl.scrollHeight;
+          }
+        }
+
+        messagesHistory.push({ role: "assistant", content: contentBuffer });
+      } catch (err) {
+        contentBuffer += "\n\n❌ Bağlantı hatası: " + err.message;
+        updateContentMarkdown(assistantContainer, contentBuffer);
+      } finally {
+        isGenerating = false;
+        document.getElementById("sendBtnText").innerText = "Gönder";
+        lucide.createIcons();
+      }
+    }
+
+    function appendUserMessage(text) {
+      const history = document.getElementById("chatHistory");
+      const msg = document.createElement("div");
+      msg.className = "p-3 rounded-lg bg-surface-hover border border-slate-700/80 text-slate-100 flex items-start space-x-2.5";
+      msg.innerHTML = `
+        <div class="w-5 h-5 rounded-full bg-cyan-600 text-white flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">U</div>
+        <div class="flex-1 whitespace-pre-wrap leading-relaxed text-xs">${escapeHtml(text)}</div>
+      `;
+      history.appendChild(msg);
+      history.scrollTop = history.scrollHeight;
+    }
+
+    function createAssistantBubble() {
+      const box = document.createElement("div");
+      box.className = "p-3 rounded-lg bg-slate-900/90 border border-slate-800 text-slate-200 space-y-3";
+      box.innerHTML = `
+        <div class="flex items-center space-x-2 text-cyan-400 font-semibold text-xs">
+          <i data-lucide="bot" class="w-4 h-4"></i>
+          <span>Antigravity Ajanı</span>
+          <span class="text-[10px] text-slate-500 font-mono">(${document.getElementById("modelSelect").value})</span>
+        </div>
+        <div class="thought-container hidden"></div>
+        <div class="content-container leading-relaxed text-xs space-y-2">
+          <span class="text-slate-500 animate-pulse">Ajan düşünüyor ve yanıt hazırlıyor...</span>
+        </div>
+        <div class="actions-container space-y-2"></div>
+      `;
+      return box;
+    }
+
+    function updateThoughtAccordion(container, thoughtText) {
+      const thoughtBox = container.querySelector(".thought-container");
+      thoughtBox.classList.remove("hidden");
+      thoughtBox.innerHTML = `
+        <details class="group bg-slate-950/80 border border-slate-800 rounded p-2 text-[11px] text-slate-400">
+          <summary class="cursor-pointer font-medium text-slate-400 hover:text-cyan-300 flex items-center space-x-1.5 select-none">
+            <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+            <span>Düşünce Süreci (Thinking...)</span>
+          </summary>
+          <div class="mt-2 text-slate-400 font-mono text-[10px] whitespace-pre-wrap pl-3 border-l border-slate-800 leading-relaxed max-h-48 overflow-y-auto">${escapeHtml(thoughtText)}</div>
+        </details>
+      `;
+    }
+
+    function updateContentMarkdown(container, contentText) {
+      const contentBox = container.querySelector(".content-container");
+      contentBox.innerHTML = marked.parse(contentText);
+      detectFileActions(container, contentText);
+    }
+
+    function detectFileActions(container, text) {
+      const actionsBox = container.querySelector(".actions-container");
+      actionsBox.innerHTML = "";
+
+      // Regex to find ```file:path/to/file.ext\n[content]```
+      const filePattern = /```file:([^\n]+)\n([\s\S]*?)```/g;
+      let match;
+      while ((match = filePattern.exec(text)) !== null) {
+        const filePath = match[1].trim();
+        const fileContent = match[2];
+
+        const card = document.createElement("div");
+        card.className = "p-2.5 rounded bg-cyan-950/40 border border-cyan-800/80 flex items-center justify-between text-xs";
+        card.innerHTML = `
+          <div class="flex items-center space-x-2">
+            <i data-lucide="file-code" class="w-4 h-4 text-cyan-400"></i>
+            <div>
+              <div class="font-semibold text-cyan-300 font-mono">${escapeHtml(filePath)}</div>
+              <div class="text-[10px] text-slate-400">Önerilen Dosya Değişikliği</div>
+            </div>
+          </div>
+          <button onclick="applyFileContent('${escapeHtml(filePath)}', ${JSON.stringify(fileContent).replace(/"/g, '&quot;')})" class="px-2.5 py-1 rounded bg-cyan-500 hover:bg-cyan-400 text-black font-semibold text-[11px] flex items-center space-x-1 transition shadow-sm">
+            <i data-lucide="check" class="w-3.5 h-3.5"></i>
+            <span>Projeye Uygula</span>
+          </button>
+        `;
+        actionsBox.appendChild(card);
+      }
+      lucide.createIcons();
+    }
+
+    async function applyFileContent(filePath, content) {
+      try {
+        const res = await fetch("/api/file", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: filePath, content: content }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          appendTerminalOutput(`✓ [Değişiklik Uygulandı] ${filePath}`);
+          await loadWorkspace();
+          await openFile(filePath);
+        } else {
+          alert("Değişiklik uygulanamadı: " + data.error);
+        }
+      } catch (err) {
+        alert("Hata: " + err.message);
+      }
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    function createNewFilePrompt() {
+      const name = prompt("Yeni dosya adı (örn: utils.py):");
+      if (!name) return;
+      applyFileContent(name, "# Yeni dosya\n");
+    }
+
+    function filterFiles() {
+      const q = document.getElementById("fileSearch").value.toLowerCase();
+      const items = document.querySelectorAll("#fileTree > div");
+      items.forEach(el => {
+        const txt = el.innerText.toLowerCase();
+        if (txt.includes(q)) el.classList.remove("hidden");
+        else el.classList.add("hidden");
+      });
+    }
+
+    async function refreshFiles() {
+      await loadWorkspace();
+      appendTerminalOutput("[Dosya listesi yenilendi]");
+    }
+  </script>
+</body>
+</html>
