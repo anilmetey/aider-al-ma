@@ -16,4 +16,4 @@ if ! curl -sf http://127.0.0.1:11434/api/tags >/dev/null; then
   done
 fi
 
-exec aider --model ollama/qwen2.5-coder:3b --yes-always "$@"
+exec aider --git --model ollama/qwen2.5-coder:3b --yes-always "$@"
