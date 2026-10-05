@@ -1,6 +1,8 @@
 #!/bin/zsh
 set -euo pipefail
 
+cd "$(dirname "$0")"
+
 export OLLAMA_API_BASE="${OLLAMA_API_BASE:-http://127.0.0.1:11434}"
 
 if ! curl -sf http://127.0.0.1:11434/api/tags >/dev/null; then
